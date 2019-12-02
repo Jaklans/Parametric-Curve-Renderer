@@ -1,0 +1,115 @@
+#version 450
+#extension GL_ARB_separate_shader_objects : enable
+#define WIDTH 970.0f
+#define HEIGHT 540.0f
+#define WORKGROUP_SIZE 1
+
+layout(local_size_x = WORKGROUP_SIZE, local_size_y = WORKGROUP_SIZE, local_size_y = 1) in;
+layout(binding = 0, rgba8) uniform writeonly image2D outputTexture;
+
+
+struct renderData{
+	vec3 color;
+	float ambient;
+	float diffuse;
+	float phong;
+};
+
+struct light{
+	vec3 pos;
+	vec3 color;
+	float intensity;
+};
+
+const light mainLight = light(vec3(0, 5, 0), vec3(1,1,1), 1);
+
+struct hitData {
+	vec3 pos;
+	float dis;
+	vec3 norm;
+	renderData rd;
+};
+
+hitData checkPrimaryRay(vec3 ray) {
+	hitData result;
+	result.dis = 9999999;
+
+	vec3 pos;
+	float dis;
+
+	// Example from previous project, testing ray-sphere intercepts
+/*
+	for(int i = 0; i < SPHERE_COUNT; i++){
+			//Store shortest vector from sphere center to ray
+		pos = spheres[i].pos - (dot(ray, spheres[i].pos) * ray);
+			//Store length of this vector
+		dis = length(pos);
+
+			//Jump out if ray does not intercept
+		if(dis > spheres[i].rad) continue;
+
+			//Determine distance to interception
+		dis = length(pos + spheres[i].pos) - sqrt(spheres[i].rad * spheres[i].rad - dot(pos, pos));
+		
+		if(dis > result.dis) continue;
+
+		result.pos = ray * dis;
+		result.dis = dis;
+		result.norm = normalize(spheres[i].pos - result.pos);
+		result.rd = spheres[i].rd;
+	}
+*/
+	return result;
+}
+
+//Return 1 if ray gets to light, 0 if it hits geometry first
+float checkSecondaryRay(vec3 ray, vec3 pos) {
+
+	//Example of lighting check from previous project
+/*
+	for(int i = 0; i < SPHERE_COUNT; i++){
+		if (length(spheres[i].pos - pos - (dot(ray, spheres[i].pos - pos) * ray)) < spheres[i].rad - .1) return 0;
+	}
+*/
+	return 1;
+}
+
+
+void main() {
+	vec2 coords = vec2(gl_GlobalInvocationID.x / (WIDTH * WORKGROUP_SIZE), gl_GlobalInvocationID.y / (WIDTH * WORKGROUP_SIZE));
+
+	// Create normalized Ray (Bit janky)
+	vec3 ray = normalize(
+		mix(
+			vec3( 1.0,0.0,0.0), 
+			vec3(-1.0,0.0,0.0),
+			coords.x)
+		+
+		mix(
+			vec3(0.0, 1.0,0.0), 
+			vec3(0.0,-1.0,0.0),
+			coords.y)
+		+ vec3(0.0, 0.0, 1.0));
+
+
+	hitData hit = checkPrimaryRay(ray);
+
+	if(hit.dis > 999999){
+		// No hit, render ray direction as color
+
+		imageStore(outputTexture, ivec2(gl_WorkGroupID.xy), vec4(ray,1));
+	}
+	else{
+		// Run basic shading and store result
+
+		vec3 s = normalize(hit.pos - mainLight.pos);
+		vec3 r =  s - 2 * dot(hit.norm, s) * hit.norm;
+
+		float unobstructed = checkSecondaryRay(mainLight.pos - hit.pos, hit.pos);
+
+		float ld = mainLight.intensity * hit.rd.diffuse * dot(s, hit.norm) * unobstructed;
+		float ls = mainLight.intensity * hit.rd.phong * pow(dot(-ray, r), 50) * unobstructed;
+		vec3 color = ((hit.rd.ambient + ld) * mainLight.color * hit.rd.color) + max(ls, 0) * mainLight.color;
+		imageStore(outputTexture, ivec2(gl_WorkGroupID.xy), vec4(color, 1));
+	}
+}

@@ -1,2 +1,2 @@
-# Parametric-Curve-Ray-Traced-Renderer
-A Vulkan based renderer designed to show geometry described via parametric curves
+# Parametric Curve Ray Tracer
+A Vulkan based renderer designed to show geometry described via parametric curves using a ray tracing algorithim
