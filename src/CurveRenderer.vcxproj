@@ -78,7 +78,7 @@
       </Command>
     </PostBuildEvent>
     <PreBuildEvent>
-      <Command>call shaders\compileShaders $(OutputPath)assets\shaders\ &amp; xcopy /Y /E /I assets $(OutputPath)assets</Command>
+      <Command>call shaders\compileShaders $(OutputPath)assets\shaders\</Command>
     </PreBuildEvent>
     <CustomBuildStep>
       <Command>call shaders\compileShaders $(OutputPath)assets\shaders\ &amp; xcopy /Y /E /I assets $(OutputPath)assets</Command>
