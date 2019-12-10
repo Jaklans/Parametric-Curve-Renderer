@@ -57,6 +57,9 @@ static std::vector<char> readFile(const std::string& filename) {
 
 
 	void VulkanInstance::Init() {
+		//Extrodinarily frustrating, but this fixes a runtime error
+		commandBuffers.resize(3);
+
 		glfwInit();
 
 		InitWindow();
