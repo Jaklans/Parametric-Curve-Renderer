@@ -104,7 +104,7 @@ createImage(WIDTH, HEIGHT, VK_FORMAT_R8G8B8A8_UNORM, VK_IMAGE_USAGE_SAMPLED_BIT 
 		//createImage(WIDTH, HEIGHT, VK_FORMAT_R8G8B8A8_UNORM, VK_IMAGE_USAGE_STORAGE_BIT, computeTarget, computeTargetMemory);
 	}
 
-	void VulkanInstance::drawFrame(bool firstFrame) {
+	void VulkanInstance::drawFrame() {
 		vkWaitForFences(device, 1, &sentFrameFences[currentFrame], VK_TRUE, UINT64_MAX);
 		vkResetFences(device, 1, &sentFrameFences[currentFrame]);
 
@@ -123,8 +123,7 @@ createImage(WIDTH, HEIGHT, VK_FORMAT_R8G8B8A8_UNORM, VK_IMAGE_USAGE_SAMPLED_BIT 
 		}
 
 		//Redefine Command Buffers (unfortunate)
-		if(firstFrame) resetCmdBuffer(currentFrame, VK_IMAGE_LAYOUT_UNDEFINED);
-		else resetCmdBuffer(currentFrame);
+		resetCmdBuffer(currentFrame);
 
 		VkSubmitInfo submitInfo = {};
 		submitInfo.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
@@ -969,7 +968,7 @@ createImage(WIDTH, HEIGHT, VK_FORMAT_R8G8B8A8_UNORM, VK_IMAGE_USAGE_SAMPLED_BIT 
 		{
 			//VkPushConstantRange pushConstantRange = primative::Uniform::getPushConstantRange();
 
-			VkDescriptorSetLayoutBinding layoutDescriptors[1];
+			VkDescriptorSetLayoutBinding layoutDescriptors[2];
 
 			//Sampler Layout Binding
 			layoutDescriptors[0] = {};
@@ -978,6 +977,7 @@ createImage(WIDTH, HEIGHT, VK_FORMAT_R8G8B8A8_UNORM, VK_IMAGE_USAGE_SAMPLED_BIT 
 			layoutDescriptors[0].descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
 			layoutDescriptors[0].stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT;
 			layoutDescriptors[0].pImmutableSamplers = nullptr;
+
 
 			VkDescriptorSetLayoutCreateInfo layoutInfo = {};
 			layoutInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO;
@@ -993,7 +993,7 @@ createImage(WIDTH, HEIGHT, VK_FORMAT_R8G8B8A8_UNORM, VK_IMAGE_USAGE_SAMPLED_BIT 
 			pipelineLayoutInfo.setLayoutCount = 1;
 			pipelineLayoutInfo.pSetLayouts = &descriptorSetLayout;
 			pipelineLayoutInfo.pushConstantRangeCount = 0;
-			pipelineLayoutInfo.pPushConstantRanges = nullptr; //&pushConstantRange;
+			pipelineLayoutInfo.pPushConstantRanges = nullptr;
 
 			if (vkCreatePipelineLayout(device, &pipelineLayoutInfo, nullptr, &pipelineLayout) != VK_SUCCESS) {
 				throw std::runtime_error("Failed to create Pipeline Layout");
@@ -1118,7 +1118,7 @@ createImage(WIDTH, HEIGHT, VK_FORMAT_R8G8B8A8_UNORM, VK_IMAGE_USAGE_SAMPLED_BIT 
 		}
 	}
 
-	void VulkanInstance::resetCmdBuffer(size_t index, VkImageLayout initialLayoutTEMP) {
+	void VulkanInstance::resetCmdBuffer(size_t index) {
 		vkResetCommandBuffer(commandBuffers[index], VK_COMMAND_BUFFER_RESET_RELEASE_RESOURCES_BIT);
 		VkCommandBufferBeginInfo beginInfo = {};
 		beginInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
@@ -1142,7 +1142,7 @@ createImage(WIDTH, HEIGHT, VK_FORMAT_R8G8B8A8_UNORM, VK_IMAGE_USAGE_SAMPLED_BIT 
 vkCmdExecuteCommands(commandBuffers[index], 1, &compCmd);
 VkImageMemoryBarrier imageMemoryBarrier = {};
 imageMemoryBarrier.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER;
-imageMemoryBarrier.oldLayout = initialLayoutTEMP;
+imageMemoryBarrier.oldLayout = VK_IMAGE_LAYOUT_UNDEFINED;
 imageMemoryBarrier.newLayout = VK_IMAGE_LAYOUT_GENERAL;
 imageMemoryBarrier.image = outputImage;
 imageMemoryBarrier.subresourceRange = { VK_IMAGE_ASPECT_COLOR_BIT, 0, 1, 0, 1 };
@@ -1406,12 +1406,18 @@ vkCmdPipelineBarrier(
 			throw std::runtime_error("Failed to create descriptor set layout");
 		}
 
+
+		VkPushConstantRange pushConstantRange = {};
+		pushConstantRange.offset = 0;
+		pushConstantRange.size = sizeof(glm::mat4);
+		pushConstantRange.stageFlags = VK_SHADER_STAGE_COMPUTE_BIT;
+
 		VkPipelineLayoutCreateInfo pipelineLayoutInfo = {};
 		pipelineLayoutInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO;
 		pipelineLayoutInfo.setLayoutCount = 1;
 		pipelineLayoutInfo.pSetLayouts = &compDescriptorSetLayout;
-		pipelineLayoutInfo.pushConstantRangeCount = 0;
-		pipelineLayoutInfo.pPushConstantRanges = nullptr;
+		pipelineLayoutInfo.pushConstantRangeCount = 1;
+		pipelineLayoutInfo.pPushConstantRanges = &pushConstantRange;
 
 		if (vkCreatePipelineLayout(device, &pipelineLayoutInfo, nullptr, &compPipelineLayout) != VK_SUCCESS) {
 			throw std::runtime_error("Failed to create Pipeline Layout");
@@ -1483,8 +1489,11 @@ vkCmdPipelineBarrier(
 			samplerWrite.dstSet = descriptorSets[i];
 			vkUpdateDescriptorSets(device, 1, &samplerWrite, 0, nullptr);
 		}
-		imageInfo.imageLayout = VK_IMAGE_LAYOUT_GENERAL;
+		imageInfo.imageLayout = VK_IMAGE_LAYOUT_UNDEFINED;
+		imageInfo.sampler = 0;
+
 		samplerWrite.descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_IMAGE;
 		samplerWrite.dstSet = descriptorSets[swapChainImages.size()];
+
 		vkUpdateDescriptorSets(device, 1, &samplerWrite, 0, nullptr);
 	}

@@ -8,47 +8,12 @@
 Application::Application(VulkanInstance vkInstance) {
 	vk = vkInstance;
 
-
-
 //Project Specific Initialization
-
-	glm::vec4 in (0, 0, 1, 0);
-	glm::mat4 mat = glm::rotate(glm::rotate(glm::mat4(1.0f), 25.0f * glm::pi<float>() /180, glm::vec3(0.0f, 1.0f, 0.0f)), 25.0f * glm::pi<float>() / 180, glm::vec3(1.0f, 0.0f, 0.0f));
-	glm::vec4 result = mat * in;
-	
-
-
-	VkImageMemoryBarrier imageMemoryBarrier = {};
-	imageMemoryBarrier.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER;
-	imageMemoryBarrier.oldLayout = VK_IMAGE_LAYOUT_GENERAL;
-	imageMemoryBarrier.newLayout = VK_IMAGE_LAYOUT_GENERAL;
-	imageMemoryBarrier.image = vk.outputImage;
-	imageMemoryBarrier.subresourceRange = { VK_IMAGE_ASPECT_COLOR_BIT, 0, 1, 0, 1 };
-	imageMemoryBarrier.srcAccessMask = VK_ACCESS_SHADER_WRITE_BIT;
-	imageMemoryBarrier.dstAccessMask = VK_ACCESS_SHADER_READ_BIT;
-
-	vk.beginSetCmdBuffer(vk.compCmd, VK_COMMAND_BUFFER_USAGE_SIMULTANEOUS_USE_BIT);
-	vkCmdBindPipeline(vk.compCmd, VK_PIPELINE_BIND_POINT_COMPUTE, vk.compPipeline);
-	vkCmdBindDescriptorSets(
-		vk.compCmd, VK_PIPELINE_BIND_POINT_COMPUTE, 
-		vk.compPipelineLayout, 
-		0, 1, 
-		&vk.descriptorSets[vk.swapChainImages.size()],
-		0, 0);
-
-	vkCmdDispatch(vk.compCmd, WIDTH, HEIGHT, 1);
-	vk.endSetCmdBuffer(vk.compCmd);
+	camPos = { 0.0f, 0.0f, -5.0f };
+	camForward = { 0.0f, 0.0f, 1.0f };
+	camSpeed = .05f;
 
 	vk.beginSetCmdBuffer(vk.drawCmd);
-
-	//vkCmdPipelineBarrier(
-	//	vk.drawCmd,
-	//	VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT,
-	//	VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT,
-	//	0,
-	//	0, nullptr,
-	//	0, nullptr,
-	//	1, &imageMemoryBarrier);
 
 	vkCmdBindDescriptorSets(
 		vk.drawCmd, VK_PIPELINE_BIND_POINT_GRAPHICS,
@@ -72,10 +37,38 @@ void Application::MainLoop() {
 }
 
 void Application::Update() {
+	if (glfwGetKey(vk.window, GLFW_KEY_UP) == GLFW_PRESS) {
+		camPos += camForward * camSpeed;
+	}
+	if (glfwGetKey(vk.window, GLFW_KEY_DOWN) == GLFW_PRESS) {
+		camPos -= camForward * camSpeed;
+	}
+	if (glfwGetKey(vk.window, GLFW_KEY_RIGHT) == GLFW_PRESS) {
+		camPos += glm::cross(camForward, { 0.0f, 1.0f, 0.0f }) * camSpeed;
+	}
+	if (glfwGetKey(vk.window, GLFW_KEY_LEFT) == GLFW_PRESS) {
+		camPos -= glm::cross(camForward, { 0.0f, 1.0f, 0.0f }) * camSpeed;
+	}
 }
 
-bool ff = true;
 void Application::Render() {
-	vk.drawFrame(ff);
-	ff = false;
+	vk.beginSetCmdBuffer(vk.compCmd, VK_COMMAND_BUFFER_USAGE_SIMULTANEOUS_USE_BIT);
+	vkCmdBindPipeline(vk.compCmd, VK_PIPELINE_BIND_POINT_COMPUTE, vk.compPipeline);
+	vkCmdBindDescriptorSets(
+		vk.compCmd, VK_PIPELINE_BIND_POINT_COMPUTE,
+		vk.compPipelineLayout,
+		0, 1,
+		&vk.descriptorSets[vk.swapChainImages.size()],
+		0, 0);
+
+	glm::mat4 worldToCam = glm::translate(glm::identity<glm::mat4>(), camPos);
+
+	vkCmdPushConstants(vk.compCmd, vk.compPipelineLayout, VK_SHADER_STAGE_COMPUTE_BIT, 0, sizeof(glm::mat4), &worldToCam);
+
+	vkCmdDispatch(vk.compCmd, WIDTH, HEIGHT, 1);
+	vk.endSetCmdBuffer(vk.compCmd);
+
+	//Draw pipeline remains unchanged
+
+	vk.drawFrame();
 }
