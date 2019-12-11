@@ -11,7 +11,7 @@ Application::Application(VulkanInstance vkInstance) {
 //Project Specific Initialization
 	camPos = { 0.0f, 0.0f, -5.0f };
 	camForward = { 0.0f, 0.0f, 1.0f };
-	camSpeed = .05f;
+	camSpeed = .005f;
 	glfwSetCursorPos(vk.window, WIDTH/2, HEIGHT/2);
 
 	vk.beginSetCmdBuffer(vk.drawCmd);
@@ -42,22 +42,28 @@ void Application::Update() {
 	glfwGetCursorPos(vk.window, &xPos, &yPos);
 	//glfwSetCursorPos(vk.window, WIDTH / 2, HEIGHT / 2);
 
-	camHorizontal += mouseSpeed * (WIDTH / 2 - xPos);
-	camVertical += mouseSpeed * (HEIGHT / 2 - yPos);
+	//camHorizontal += mouseSpeed * (WIDTH / 2 - xPos);
+	//camVertical += mouseSpeed * (HEIGHT / 2 - yPos);
+	//
+	//camForward = glm::vec3(cos(camVertical) * sin(camHorizontal), sin(camVertical), cos(camVertical) * cos(camHorizontal));
 
-	camForward = glm::vec3(cos(camVertical) * sin(camHorizontal), sin(camVertical), cos(camVertical) * cos(camHorizontal));
-
-	if (glfwGetKey(vk.window, GLFW_KEY_UP) == GLFW_PRESS) {
+	if (glfwGetKey(vk.window, GLFW_KEY_W) == GLFW_PRESS) {
 		camPos += camForward * camSpeed;
 	}
-	if (glfwGetKey(vk.window, GLFW_KEY_DOWN) == GLFW_PRESS) {
+	if (glfwGetKey(vk.window, GLFW_KEY_S) == GLFW_PRESS) {
 		camPos -= camForward * camSpeed;
 	}
-	if (glfwGetKey(vk.window, GLFW_KEY_RIGHT) == GLFW_PRESS) {
+	if (glfwGetKey(vk.window, GLFW_KEY_D) == GLFW_PRESS) {
 		camPos += glm::cross(camForward, { 0.0f, 1.0f, 0.0f }) * camSpeed;
 	}
-	if (glfwGetKey(vk.window, GLFW_KEY_LEFT) == GLFW_PRESS) {
+	if (glfwGetKey(vk.window, GLFW_KEY_A) == GLFW_PRESS) {
 		camPos -= glm::cross(camForward, { 0.0f, 1.0f, 0.0f }) * camSpeed;
+	}
+	if (glfwGetKey(vk.window, GLFW_KEY_E) == GLFW_PRESS) {
+		camPos += glm::vec3(0.0f, 1.0f, 0.0f) * camSpeed;
+	}
+	if (glfwGetKey(vk.window, GLFW_KEY_Q) == GLFW_PRESS) {
+		camPos -= glm::vec3(0.0f, 1.0f, 0.0f) * camSpeed;
 	}
 }
 

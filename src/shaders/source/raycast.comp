@@ -1,9 +1,12 @@
 #version 450
 #extension GL_ARB_separate_shader_objects : enable
-#define WIDTH 2560.0f
-#define HEIGHT 1440.0f
+//#define WIDTH 2560.0f
+//#define HEIGHT 1440.0f
+#define WIDTH 970.0f
+#define HEIGHT 540.0f
 #define WORKGROUP_SIZE 1
-#define SUBDIV_COUNT 7
+#define SUBDIV_COUNT 20
+#define RAD .01;
 
 //Workset
 layout(local_size_x = WORKGROUP_SIZE, local_size_y = WORKGROUP_SIZE, local_size_y = 1) in;
@@ -111,6 +114,13 @@ bool rayHull(vec3 ray, vec3 hmin, vec3 hmax) {
 	return (max(tsmaller[0], max(tsmaller[1], tsmaller[2])) < min(tbigger[0], min(tbigger[1], tbigger[2])));
 }
 
+bool hullTooSmol(vec3 ray, hull h){
+	vec3 hCenter = (h.max+h.min)/2;
+	//return length(max(abs(h.max), abs(h.min))) < RAD;
+	return length(h.max - h.min) < RAD;
+	return length(hCenter - (dot(hCenter, ray) * ray)) < RAD;
+}
+
 hitData checkPrimaryRay(vec3 ray) {
 	hitData result;
 	result.dis = 9999999;
@@ -121,24 +131,26 @@ hitData checkPrimaryRay(vec3 ray) {
 
 	
 	// Create initial hull
-	hull h0 = hull(
-		max(max(controlPoints[0], controlPoints[1]), max(controlPoints[2], controlPoints[3])),
-		min(min(controlPoints[0], controlPoints[1]), min(controlPoints[2], controlPoints[3])),
-		controlPoints
-	);
-
+	hull h0;
+	for(int i = 0; i < 4; i++){
+		h0.cp[i] = (ub.worldToCamera * vec4(controlPoints[i],1)).xyz;
+	}
+	h0.max = max(max(h0.cp[0], h0.cp[1]), max(h0.cp[2], h0.cp[3]));
+	h0.min = min(min(h0.cp[0], h0.cp[1]), min(h0.cp[2], h0.cp[3]));
+	
 	// Test vs ray and escape if no intercept
 	if(!rayHull(ray, h0.min, h0.max)) return result;
 
 	hull h1;
 
-	for(int i = 0; i < SUBDIV_COUNT; i++){
+	while(true){
 	
 		h1 = hullFromU(0, .5, h0.cp);
 
 		if(rayHull(ray, h1.min, h1.max)){
 			h0 = h1;
 			//result.rd.color=vec3(0,0,float(i)/float(SUBDIV_COUNT));
+			if(hullTooSmol(ray,h0)) break;
 			continue;
 		}
 
@@ -147,6 +159,7 @@ hitData checkPrimaryRay(vec3 ray) {
 		if(rayHull(ray, h1.min, h1.max)){
 			h0 = h1;
 			//result.rd.color=vec3(.5,float(i)/float(SUBDIV_COUNT),0);
+			if(hullTooSmol(ray,h0)) break;
 			continue;
 		}
 		
