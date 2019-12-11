@@ -200,7 +200,7 @@ hitData checkPrimaryRay(vec3 ray) {
 
 void main() {
 	vec2 coords = vec2(gl_GlobalInvocationID.x / (WIDTH * WORKGROUP_SIZE), gl_GlobalInvocationID.y / (HEIGHT * WORKGROUP_SIZE));
-
+	
 	// Create normalized Ray (Bit janky)
 	vec3 ray = normalize(
 		mix(
@@ -213,7 +213,17 @@ void main() {
 			vec3(0.0,-1.0,0.0),
 			coords.y)
 		+ vec3(0.0, 0.0, 2));
+		
 
+	/*float d = 1/tan(45);
+	float pX = coords.x + 0.5;
+	float pY = coords.y + 0.5;
+
+	float aspectRatio = WIDTH/HEIGHT;
+
+	vec3 ray = normalize(aspectRatio * (2 * pX / WIDTH) - 1,
+						 (2 * pY / HEIGHT) - 1,
+						 d);*/
 
 	hitData hit = checkPrimaryRay(ray);
 
