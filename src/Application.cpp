@@ -40,7 +40,7 @@ void Application::MainLoop() {
 void Application::Update() {
 	double xPos, yPos;
 	glfwGetCursorPos(vk.window, &xPos, &yPos);
-	glfwSetCursorPos(vk.window, WIDTH / 2, HEIGHT / 2);
+	//glfwSetCursorPos(vk.window, WIDTH / 2, HEIGHT / 2);
 
 	camHorizontal += mouseSpeed * (WIDTH / 2 - xPos);
 	camVertical += mouseSpeed * (HEIGHT / 2 - yPos);
