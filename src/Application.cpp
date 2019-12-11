@@ -12,6 +12,7 @@ Application::Application(VulkanInstance vkInstance) {
 	camPos = { 0.0f, 0.0f, -5.0f };
 	camForward = { 0.0f, 0.0f, 1.0f };
 	camSpeed = .05f;
+	glfwSetCursorPos(vk.window, WIDTH/2, HEIGHT/2);
 
 	vk.beginSetCmdBuffer(vk.drawCmd);
 
@@ -37,6 +38,15 @@ void Application::MainLoop() {
 }
 
 void Application::Update() {
+	double xPos, yPos;
+	glfwGetCursorPos(vk.window, &xPos, &yPos);
+	glfwSetCursorPos(vk.window, WIDTH / 2, HEIGHT / 2);
+
+	camHorizontal += mouseSpeed * (WIDTH / 2 - xPos);
+	camVertical += mouseSpeed * (HEIGHT / 2 - yPos);
+
+	camForward = glm::vec3(cos(camVertical) * sin(camHorizontal), sin(camVertical), cos(camVertical) * cos(camHorizontal));
+
 	if (glfwGetKey(vk.window, GLFW_KEY_UP) == GLFW_PRESS) {
 		camPos += camForward * camSpeed;
 	}
@@ -62,6 +72,8 @@ void Application::Render() {
 		0, 0);
 
 	glm::mat4 worldToCam = glm::translate(glm::identity<glm::mat4>(), camPos);
+	worldToCam = glm::rotate(worldToCam, camVertical, glm::vec3(1, 0, 0));
+	worldToCam = glm::rotate(worldToCam, camHorizontal, glm::vec3(0, 1, 0));
 
 	vkCmdPushConstants(vk.compCmd, vk.compPipelineLayout, VK_SHADER_STAGE_COMPUTE_BIT, 0, sizeof(glm::mat4), &worldToCam);
 
