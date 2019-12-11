@@ -3,6 +3,7 @@
 #define WIDTH 970.0f
 #define HEIGHT 540.0f
 #define WORKGROUP_SIZE 1
+#define SUBDIV_COUNT 3
 
 //Workset
 layout(local_size_x = WORKGROUP_SIZE, local_size_y = WORKGROUP_SIZE, local_size_y = 1) in;
@@ -31,6 +32,13 @@ struct light{
 
 const light mainLight = light(vec3(0, 5, 0), vec3(1,1,1), 1);
 
+const vec3 controlPoints[] = vec3[4](
+	vec3(-1, 0,   3),
+	vec3(-.3, 1,  3),
+	vec3(.3, -1,  3),
+	vec3(1, 0,    3.1)
+);
+
 struct hitData {
 	vec3 pos;
 	float dis;
@@ -38,53 +46,126 @@ struct hitData {
 	renderData rd;
 };
 
+struct hull {
+	vec3 max;
+	vec3 min;
+	vec3[4] cp;
+};
+
+vec3 pointFromU(float u, vec3[4] cp){
+	return (1-u)*(1-u)*(1-u)*cp[0] + 3*(1-u)*(1-u)*u*cp[1] + 3*(1-u)*u*u*cp[2] +  u*u*u*cp[3];
+}
+
+vec3 blossom(float u0, float u1, float u2, vec3[4] cp){
+	vec3 a[3] = {
+		mix(cp[0], cp[1], u0),
+		mix(cp[1], cp[2], u0),
+		mix(cp[2], cp[3], u0)
+	};
+	vec3 b[2] = {
+		mix(a[0], a[1], u1),
+		mix(a[1], a[2], u1)
+	};
+	return mix(b[0], b[1], u2);
+}
+
+hull hullFromU(float u0, float u1, vec3[4] cp){
+	hull val;
+	val.cp[0] = pointFromU(u0, cp);
+	val.cp[3] = pointFromU(u1, cp);
+
+	val.cp[1] = blossom(u0, u0, u1, cp);
+	val.cp[2] = blossom(u0, u1, u1, cp);
+	
+	val.max = max(max(cp[0], cp[1]), max(cp[2], cp[3]));
+	val.min = min(min(cp[0], cp[1]), min(cp[2], cp[3]));
+
+	return val;
+}
+/*
+bool rayHull(vec3 ray, vec3 A, vec3 B){
+    //vec3 origin = { 0, 0, 0 };
+
+    //since origin is always 0, A and B do not need to have the origin subrtracted from them before division
+    vec3 tA = A/ray;
+    vec3 tB = B/ray;
+
+    float tmin = (tA.x > tA.y) ? tA.x : tA.y;
+    tmin = (tmin > tA.z) ? tmin : tA.z;
+
+    float tmax = (tB.x < tB.y) ? tB.x : tB.y;
+    tmax = (tmax < tB.z) ? tmax : tB.z;
+
+    return tmax >= tmin;
+}
+*/
+
+// stollen from https://medium.com/@bromanz/another-view-on-the-classic-ray-aabb-intersection-algorithm-for-bvh-traversal-41125138b525
+bool rayHull(vec3 ray, vec3 hmin, vec3 hmax) {
+	vec3 t0s = hmin / ray;
+  	vec3 t1s = hmax / ray;
+    
+  	vec3 tsmaller = min(t0s, t1s);
+    vec3 tbigger  = max(t0s, t1s);
+    
+	return (max(tsmaller[0], max(tsmaller[1], tsmaller[2])) < min(tbigger[0], min(tbigger[1], tbigger[2])));
+}
+
 hitData checkPrimaryRay(vec3 ray) {
 	hitData result;
 	result.dis = 9999999;
 
-	vec3 pos;
-	float dis;
+	// For each curve
 
-	// Example from previous project, testing ray-sphere intercepts
-/*
-	for(int i = 0; i < SPHERE_COUNT; i++){
-			//Store shortest vector from sphere center to ray
-		pos = spheres[i].pos - (dot(ray, spheres[i].pos) * ray);
-			//Store length of this vector
-		dis = length(pos);
+	// Transform control points to camera space
 
-			//Jump out if ray does not intercept
-		if(dis > spheres[i].rad) continue;
+	
+	// Create initial hull
+	hull h0 = hull(
+		max(max(controlPoints[0], controlPoints[1]), max(controlPoints[2], controlPoints[3])),
+		min(min(controlPoints[0], controlPoints[1]), min(controlPoints[2], controlPoints[3])),
+		controlPoints
+	);
 
-			//Determine distance to interception
-		dis = length(pos + spheres[i].pos) - sqrt(spheres[i].rad * spheres[i].rad - dot(pos, pos));
+	// Test vs ray and escape if no intercept
+	if(!rayHull(ray, h0.min, h0.max)) return result;
+
+	result.dis = 1;
+	result.rd.color=vec3(1,0,1);
+	hull h1;
+
+	for(int i = 0; i < SUBDIV_COUNT; i++){
+	
+		h1 = hullFromU(0, .5, h0.cp);
+
+		if(rayHull(ray, h1.min, h1.max)){
+			h0 = h1;
+			//result.rd.color=h1.cp[2];
+			//result.rd.color=vec3(0,0,i/4);
+			continue;
+		}
+
+		h1 = hullFromU(.5, 1, h0.cp);
+
+		if(rayHull(ray, h1.min, h1.max)){
+			h0 = h1;
+			//result.rd.color=vec3(0,0,1);
+			//result.rd.color=vec3(.5,i/4,0);
+			continue;
+		}
 		
-		if(dis > result.dis) continue;
-
-		result.pos = ray * dis;
-		result.dis = dis;
-		result.norm = normalize(spheres[i].pos - result.pos);
-		result.rd = spheres[i].rd;
+		return result;
 	}
-*/
+	result.rd.color = vec3(0,1,0);
+	result.pos = pointFromU(.5, h0.cp);
+	result.dis = 1;
+
 	return result;
-}
-
-//Return 1 if ray gets to light, 0 if it hits geometry first
-float checkSecondaryRay(vec3 ray, vec3 pos) {
-
-	//Example of lighting check from previous project
-/*
-	for(int i = 0; i < SPHERE_COUNT; i++){
-		if (length(spheres[i].pos - pos - (dot(ray, spheres[i].pos - pos) * ray)) < spheres[i].rad - .1) return 0;
-	}
-*/
-	return 1;
 }
 
 
 void main() {
-	vec2 coords = vec2(gl_GlobalInvocationID.x / (WIDTH * WORKGROUP_SIZE), gl_GlobalInvocationID.y / (WIDTH * WORKGROUP_SIZE));
+	vec2 coords = vec2(gl_GlobalInvocationID.x / (WIDTH * WORKGROUP_SIZE), gl_GlobalInvocationID.y / (HEIGHT * WORKGROUP_SIZE));
 
 	// Create normalized Ray (Bit janky)
 	vec3 ray = normalize(
@@ -97,7 +178,7 @@ void main() {
 			vec3(0.0, 1.0,0.0), 
 			vec3(0.0,-1.0,0.0),
 			coords.y)
-		+ vec3(0.0, 0.0, 1.0));
+		+ vec3(0.0, 0.0, 1));
 
 
 	hitData hit = checkPrimaryRay(ray);
@@ -113,13 +194,18 @@ void main() {
 		vec3 s = normalize(hit.pos - mainLight.pos);
 		vec3 r =  s - 2 * dot(hit.norm, s) * hit.norm;
 
-		float unobstructed = checkSecondaryRay(mainLight.pos - hit.pos, hit.pos);
+		float unobstructed = 1;//checkSecondaryRay(mainLight.pos - hit.pos, hit.pos);
 
 		float ld = mainLight.intensity * hit.rd.diffuse * dot(s, hit.norm) * unobstructed;
 		float ls = mainLight.intensity * hit.rd.phong * pow(dot(-ray, r), 50) * unobstructed;
 		vec3 color = ((hit.rd.ambient + ld) * mainLight.color * hit.rd.color) + max(ls, 0) * mainLight.color;
-		imageStore(outputTexture, ivec2(gl_WorkGroupID.xy), vec4(color, 1));
+		imageStore(outputTexture, ivec2(gl_WorkGroupID.xy), vec4(hit.rd.color, 1));
 	}
+	//imageStore(outputTexture, ivec2(gl_WorkGroupID.xy), vec4(pointFromU(coords.x,hullFromU(.5,1,controlPoints).cp).yyy+vec3(.1,.1,.1), 1));
 
-	//imageStore(outputTexture, ivec2(gl_WorkGroupID.xy), ub.worldToCamera[0]);
+	//bool rayHull(vec3 ray, vec3 min, vec3 max, float tmin, float tmax)
+
+	//if(rayHull(ray,vec3(-.5,-.5, 3),vec3(.5,.5, 3.1))){
+	//	imageStore(outputTexture, ivec2(gl_WorkGroupID.xy), vec4(1,0,0, 1));
+	//}
 }
