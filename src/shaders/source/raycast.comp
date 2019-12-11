@@ -6,7 +6,8 @@
 #define HEIGHT 540.0f
 #define WORKGROUP_SIZE 1
 #define SUBDIV_COUNT 20
-#define RAD .01;
+#define RAD .01
+#define MAX_TOL .1
 
 //Workset
 layout(local_size_x = WORKGROUP_SIZE, local_size_y = WORKGROUP_SIZE, local_size_y = 1) in;
@@ -116,6 +117,30 @@ bool rayHull(vec3 ray, vec3 hmin, vec3 hmax) {
 
 bool hullTooSmol(vec3 ray, hull h){
 	vec3 hCenter = (h.max+h.min)/2;
+
+	for (int i =0;i<5;i++){
+	    float u = .5;
+	    vec3 a = 3*(h.cp[0]+h.cp[1]+h.cp[2]+h.cp[3]);
+	    vec3 b = -2*h.cp[2] - 4*h.cp[1] - 6*h.cp[0];
+	    vec3 c = h.cp[1] + 3*h.cp[0];
+	    
+	    vec3 tangent = a*u*u + b*u + c;
+
+		float rdt = dot(ray, tangent);
+
+		if(rdt > MAX_TOL) {u += .05;continue;}
+		if(rdt < MAX_TOL) {u -= .05;continue;}
+	    
+	    vec3 v = pointFromU(u, h.cp);
+	    
+	    float d = dot(tangent, v);
+	    
+	    float t = d / dot(tangent, ray);
+		break;
+	}
+
+	//return length((t * ray) - v) < RAD;
+
 	//return length(max(abs(h.max), abs(h.min))) < RAD;
 	return length(h.max - h.min) < RAD;
 	return length(hCenter - (dot(hCenter, ray) * ray)) < RAD;
